@@ -6,7 +6,7 @@ import requests
 import streamlit as st
 import asyncio
 import aiohttp
-import datetime
+import time
 
 import numpy as np
 from PIL import Image
@@ -44,13 +44,27 @@ with st.sidebar:
     if st.session_state.model_sd_loaded:
         st.success(f"Model loaded: {MODEL_NAME_SD}", icon="👉")
 
+    st.subheader("SD Model parameters")
+    num_inference_steps = st.sidebar.slider(
+        "steps", min_value=1, max_value=150, value=10, step=1
+    )
+    height = st.sidebar.slider(
+        "height", min_value=256, max_value=2048, value=512, step=8
+    )
+    width = st.sidebar.slider(
+        "max_tokens", min_value=256, max_value=2048, value=512, step=8
+    )
+    guidance_scale = st.sidebar.slider(
+        "guidance_scale", min_value=1.0, max_value=30.0, value=5.0, step=0.5
+    )
+
 prompt = st.text_input("Text Prompt", "An astronaut riding a horse")
 
 # TODO: For Tests, delete when LLM added
 prompt = [prompt,
           "A robot playing a violin",
           "A dragon flying over the mountains",
-          "A mermaid painting a sunset on the beach"
+          "A mermaid painting sunset on the beach"
           ]
 
 
@@ -60,7 +74,11 @@ def generate_sd_response_v1(prompt_input):
     for pr in prompt_input:
         data_input = json.dumps(
             {
-                "prompt": pr
+                "prompt": pr,
+                "guidance_scale": guidance_scale,
+                "num_inference_steps": num_inference_steps,
+                "height": height,
+                "width": width,
             }
         )
         response.append(requests.post(url=url, data=data_input).text)
@@ -72,7 +90,11 @@ async def send_inference_request(session, prompt_input):
 
     data_input = json.dumps(
         {
-            "prompt": prompt_input
+            "prompt": prompt_input,
+            "guidance_scale": guidance_scale,
+            "num_inference_steps": num_inference_steps,
+            "height": height,
+            "width": width,
         }
     )
 
@@ -83,8 +105,7 @@ async def send_inference_request(session, prompt_input):
 
 
 async def generate_sd_response_v2(prompts):
-    my_timeout = aiohttp.ClientTimeout(total=None)
-    async with aiohttp.ClientSession(timeout=my_timeout) as session:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=None)) as session:
         tasks = []
         for prompt in prompts:
             tasks.append(send_inference_request(session, prompt))
@@ -97,14 +118,23 @@ def response_postprocess(response):
 
 # if st.button("Generate Images"):
 #     with st.spinner('Generating images...'):
+#         start_time = time.time()
 #         res = generate_sd_response_v1(prompt)
+#         inference_time = time.time() - start_time
+
 #         images = response_postprocess(res)
+
+#         st.write(f"Inference time: {inference_time:.2f} seconds")
 #         st.image(images, caption=["Generated Image"] * len(images), use_column_width=True)
 
 
 if st.button("Generate Images"):
     with st.spinner('Generating images...'):
+        start_time = time.time()
         res = asyncio.run(generate_sd_response_v2(prompt))
+        inference_time = time.time() - start_time
+
         images = response_postprocess(res)
-        st.image(images, caption=["Generated Image"]
-                 * len(images), use_column_width=True)
+
+        st.write(f"Inference time: {inference_time:.2f} seconds")
+        st.image(images, caption=prompt, use_column_width=True)
