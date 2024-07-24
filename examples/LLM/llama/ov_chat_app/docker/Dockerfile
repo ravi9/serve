@@ -11,6 +11,7 @@ ARG NO_PROXY
 ENV http_proxy=$HTTP_PROXY
 ENV https_proxy=$HTTPS_PROXY
 ENV no_proxy=$NO_PROXY
+ENV TS_DISABLE_TOKEN_AUTHORIZATION=true
 
 USER root
 
@@ -22,13 +23,13 @@ COPY $EXAMPLE_DIR/requirements.txt /home/model-server/chat_bot/requirements.txt
 RUN pip install -r /home/model-server/chat_bot/requirements.txt && huggingface-cli login --token $HUGGINGFACE_TOKEN
 
 WORKDIR /home/model-server/chat_bot
-RUN git clone https://github.com/ggerganov/llama.cpp.git build && \
-    cd build && \
-    make && \
-    python -m pip install -r requirements.txt
+# RUN git clone https://github.com/ggerganov/llama.cpp.git build && \
+#     cd build && \
+#     make && \
+#     python -m pip install -r requirements.txt
 
 COPY $EXAMPLE_DIR  /home/model-server/chat_bot
-RUN cd sdxl && pip install -r requirements.txt
+RUN cd sd && pip install -r requirements.txt
 
 COPY $EXAMPLE_DIR/dockerd-entrypoint.sh /usr/local/bin/dockerd-entrypoint.sh
 COPY $EXAMPLE_DIR/config.properties /home/model-server/config.properties
