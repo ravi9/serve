@@ -1,7 +1,7 @@
 import os
 import argparse
 import torch
-from diffusers import DiffusionPipeline
+from diffusers import DiffusionPipeline, UNet2DConditionModel
 from huggingface_hub import HfApi
 
 
@@ -44,11 +44,16 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+unet = UNet2DConditionModel.from_pretrained("latent-consistency/lcm-sdxl", torch_dtype=torch.float16, variant="fp16")
+
 pipeline = DiffusionPipeline.from_pretrained(
     args.model_name,
-    torch_dtype=torch.float32,
-    use_safetensors=True,
+    unet=unet,
+    torch_dtype=torch.float16,
+    variant="fp16",
 )
 pipeline.save_pretrained(args.model_path)
+unet.save_pretrained(f"{args.model_path}/lcm")
+
 
 print(f"\nFiles for '{args.model_name}' is downloaded to '{args.model_path}'")

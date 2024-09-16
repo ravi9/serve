@@ -3,14 +3,14 @@ import openvino.torch
 import logging
 
 from diffusers import (
+    DiffusionPipeline,
     StableDiffusionXLPipeline,
     StableDiffusionPipeline,
-    DPMSolverMultistepScheduler,
+    UNet2DConditionModel,
+    LCMScheduler,
 )
 
 logger = logging.getLogger(__name__)
-PROMPT = "ghibli style, a fantasy landscape with castles"
-
 
 def load_pipeline(
     ckpt: str,
@@ -19,24 +19,30 @@ def load_pipeline(
     compile_mode: str,
     change_comp_config: bool,
     compile_options: str,
-    is_xl: str,
+    is_xl: bool,
+    is_lcm: bool
 ):
     """Loads the SDXL pipeline."""
 
-    dtype = torch.float32
+    dtype = torch.float16
     logger.info(f"Using dtype: {dtype}")
     compile_options_str = ", ".join([f"{k} {v}" for k, v in compile_options.items()])
     logger.info(f"Compiled model with {compile_options_str}")
 
-    if is_xl:
+    if is_lcm:
+        unet = UNet2DConditionModel.from_pretrained(f"{ckpt}/lcm/", torch_dtype=dtype)
+        pipe = DiffusionPipeline.from_pretrained(ckpt, unet=unet, torch_dtype=dtype, variant="fp16")
+        pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+        pipe.text_encoder = torch.compile(pipe.text_encoder, **compile_options)
+        
+    elif is_xl:
         pipe = StableDiffusionXLPipeline.from_pretrained(
-            ckpt, torch_dtype=dtype, use_safetensors=True
-        )
+                    ckpt, torch_dtype=dtype, use_safetensors=True
+                )
     else:
         pipe = StableDiffusionPipeline.from_pretrained(
             ckpt, torch_dtype=dtype, use_safetensors=True, safety_checker=None
         )
-    pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
     if compile_unet:
         print("Compile UNet.")
